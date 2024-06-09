@@ -6,7 +6,7 @@ use mongodb::Collection;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
-use crate::{database::CollectionOwner, socket::{leaderboard::ScoreType, player::{player_xp_listener::{PlayerXPListener, XP_PER_LEVEL}, player_events::PlayerXPGainData}, server::server_context::{ServerContext}, event_type::EventType}};
+use crate::{database::CollectionOwner, socket::{leaderboard::ScoreType, player::{player_xp_listener::PlayerXPListener, player_events::PlayerXPGainData}, server::server_context::ServerContext, event_type::EventType}};
 
 use super::{punishment::StaffNote, level::LevelGamemode, r#match::Match};
 
@@ -116,7 +116,7 @@ pub struct PlayerStats {
 
 impl PlayerStats {
     pub fn get_level(&self) -> u32 {
-        (self.xp + XP_PER_LEVEL) / XP_PER_LEVEL
+        ((0.6f32 * (self.xp as f32).powf(0.5f32)) as u32) + 1
     }
 
     pub fn get_score(&self, score_type: &ScoreType) -> u32 {
