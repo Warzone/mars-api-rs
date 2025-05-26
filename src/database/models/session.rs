@@ -1,13 +1,15 @@
 use log::warn;
 use mars_api_rs_derive::IdentifiableDocument;
 use mars_api_rs_macro::IdentifiableDocument;
+use rocket_okapi::okapi::schemars;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::database::CollectionOwner;
 
 use super::player::SimplePlayer;
 
-#[derive(Deserialize, Serialize, IdentifiableDocument, Clone)]
+#[derive(Deserialize, Serialize, JsonSchema, IdentifiableDocument, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Session {
     #[id]

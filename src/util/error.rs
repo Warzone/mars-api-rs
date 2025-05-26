@@ -1,5 +1,8 @@
-use serde::{Serialize, Deserialize};
-use rocket::{response::{self, Response, Responder}, Request, http::{Status, ContentType}, serde::json::Json};
+use rocket::{http::{ContentType, Status}, Request, response::{self, Responder, Response}, serde::json::Json};
+use rocket_okapi::{gen::OpenApiGenerator, okapi::{Map as OkapiMap, schemars}, response::OpenApiResponderInner, Result as OkapiResult};
+use rocket_okapi::okapi::openapi3::{MediaType, RefOr, Response as OkapiResponse, Responses};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
 pub struct ApiErrorResponder {
@@ -178,7 +181,7 @@ impl<'r> Responder<'r, 'static> for ApiErrorResponder {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiErrorV2 {
     code: ApiExceptionType,
@@ -212,7 +215,7 @@ impl ApiError {
     }
 }
 
-#[derive(Serialize, Deserialize, Display, Clone)]
+#[derive(Serialize, Deserialize, Display, Clone, JsonSchema)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiExceptionType {
@@ -236,4 +239,31 @@ enum ApiExceptionType {
     PunishmentMissing,
     NoteMissing,
     Anonymous
+}
+
+// TODO: Document errors more precisely. This just defaults to a 400 Bad Request for all errors.
+impl OpenApiResponderInner for ApiErrorResponder {
+    fn responses(gen: &mut OpenApiGenerator) -> OkapiResult<Responses> {
+        let mut responses = Responses::default();
+        let schema = gen.json_schema::<ApiErrorV2>();
+        responses.responses.insert(
+            "400".to_owned(),
+            RefOr::Object(OkapiResponse {
+                description: "Bad Request".to_owned(),
+                content: {
+                    let mut content = OkapiMap::new();
+                    content.insert(
+                        "application/json".to_owned(),
+                        MediaType {
+                            schema: Some(schema),
+                            ..Default::default()
+                        },
+                    );
+                    content
+                },
+                ..Default::default()
+            }),
+        );
+        Ok(responses)
+    }
 }

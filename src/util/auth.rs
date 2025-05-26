@@ -1,4 +1,7 @@
 use rocket::{request::{FromRequest, self}, Request, http::Status};
+use rocket_okapi::gen::OpenApiGenerator;
+use rocket_okapi::okapi::openapi3::{SecurityScheme, SecuritySchemeData};
+use rocket_okapi::request::{OpenApiFromRequest, RequestHeaderInput};
 
 use crate::MarsAPIState;
 
@@ -62,5 +65,22 @@ impl<'r> FromRequest<'r> for AuthorizationToken {
             },
             None => create_failure_outcome(Status::Unauthorized, String::from("Did not provide authorization header"))
         }
+    }
+}
+
+impl<'r> OpenApiFromRequest<'r> for AuthorizationToken {
+
+    // TODO: Use actual authentication scheme. This is an example.
+    fn from_request_input(gen: &mut OpenApiGenerator, name: String, required: bool) -> rocket_okapi::Result<RequestHeaderInput> {
+        let header_input = RequestHeaderInput::Security(name, SecurityScheme {
+            description: Some("Authorization token for the API".to_string()),
+            data: SecuritySchemeData::Http {
+                scheme: "Bearer".to_string(),
+                bearer_format: None,
+            },
+            extensions: Default::default(),
+        }, Default::default());
+
+        Ok(header_input)
     }
 }

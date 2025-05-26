@@ -1,19 +1,27 @@
-mod payloads;
+use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
 
 use futures::future::join_all;
 use mongodb::bson::doc;
-use payloads::PlayerPreLoginRequest;
-use rocket::{serde::json::Json, Build, Rocket, State, http::Status};
+use rocket::{Build, http::Status, Rocket, serde::json::Json, State};
+use rocket_okapi::{get_nested_endpoints_and_docs, mount_endpoints_and_merged_docs, openapi, openapi_get_routes, openapi_get_routes_spec, openapi_get_spec, openapi_routes};
+use rocket_okapi::okapi::openapi3::OpenApi;
+use rocket_okapi::settings::OpenApiSettings;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
-use crate::{util::{auth::AuthorizationToken, error::{ApiError, ApiErrorResponder}, string::to_utf8_byte_array, responder::{JsonResponder, EmptyResponse}, time::get_u64_time_millis, r#macro::unwrap_helper}, MarsAPIState, database::{Database, models::{punishment::{Punishment, PunishmentKind, StaffNote}, player::{Player, PlayerStats, SessionRecord}, session::Session, rank::Rank, tag::Tag}}, http::player::payloads::{PlayerLoginRequest, PlayerLookupResponse, PlayerAddNoteRequest, PlayerSetActiveTagRequest}, socket::leaderboard::{Leaderboard, ScoreType, LeaderboardPeriod}};
-use sha2::{Sha256, Digest};
 
-use self::payloads::{PlayerPreLoginResponse, PlayerPreLoginResponder, PlayerLoginResponse, PlayerLogoutRequest, PlayerProfileResponder, PlayerProfileResponse, PlayerAltResponse};
-use std::{time::{SystemTime, UNIX_EPOCH}, collections::HashMap};
+use payloads::PlayerPreLoginRequest;
+
+use crate::{database::{Database, models::{player::{Player, PlayerStats, SessionRecord}, punishment::{Punishment, PunishmentKind, StaffNote}, rank::Rank, session::Session, tag::Tag}}, http::player::payloads::{PlayerAddNoteRequest, PlayerLoginRequest, PlayerLookupResponse, PlayerSetActiveTagRequest}, MarsAPIState, socket::leaderboard::{Leaderboard, LeaderboardPeriod, ScoreType}, util::{auth::AuthorizationToken, error::{ApiError, ApiErrorResponder}, r#macro::unwrap_helper, responder::{EmptyResponse, JsonResponder}, string::to_utf8_byte_array, time::get_u64_time_millis}};
 use crate::database::models::ip_identity::IpIdentity;
 
 use super::punishment::payloads::PunishmentIssueRequest;
 
+use self::payloads::{PlayerAltResponse, PlayerLoginResponse, PlayerLogoutRequest, PlayerPreLoginResponder, PlayerPreLoginResponse, PlayerProfileResponder, PlayerProfileResponse};
+
+mod payloads;
+mod spec;
+
+#[openapi()]
 #[post("/<player_id>/prelogin", format = "json", data = "<prelogin_req>")]
 pub async fn prelogin(
     state: &State<MarsAPIState>, 
@@ -125,6 +133,7 @@ macro_rules! async_extract_player_from_url_v2 {
 }
 
 
+#[openapi()]
 #[post("/<player_id>/login", format = "json", data = "<login_req>")]
 pub async fn login(
     state: &State<MarsAPIState>, 
@@ -172,6 +181,7 @@ pub async fn login(
 }
 
 
+#[openapi()]
 #[post("/logout", format = "json", data = "<logout_req>")]
 pub async fn logout(
     state: &State<MarsAPIState>, 
@@ -211,17 +221,18 @@ pub async fn logout(
 }
 
 
+#[openapi()]
 #[get("/<player_id>?<include_leaderboard_positions>")]
 pub async fn profile(
     state: &State<MarsAPIState>, 
     player_id: &str,
-    include_leaderboard_positions: bool
+    include_leaderboard_positions: Option<bool>
 ) -> Result<PlayerProfileResponder, ApiErrorResponder> {
     let player_id = player_id.to_lowercase();
     let player : Player = async_extract_player_from_url_v2!(&player_id, state);
     let profile = player.sanitized_copy();
-    if !include_leaderboard_positions {
-        return Ok(PlayerProfileResponder::RawProfile(profile))
+    if !include_leaderboard_positions.unwrap_or(false) {
+        return Ok(PlayerProfileResponder::RawProfile(profile));
     };
     // omitted: messages sent, server + game playtime
     let included_lbs : Vec<&Leaderboard> = vec![
@@ -272,6 +283,7 @@ pub async fn profile(
 
 
 // why isn't the url parameter used?
+#[openapi()]
 #[post("/<_player_id>/punishments", format = "json", data = "<pun_issue_req>")]
 pub async fn issue_punishment(
     state: &State<MarsAPIState>, 
@@ -310,6 +322,7 @@ pub async fn issue_punishment(
 }
 
 
+#[openapi()]
 #[get("/<player_id>/punishments")]
 pub async fn get_punishments(
     state: &State<MarsAPIState>, 
@@ -335,6 +348,7 @@ pub fn sha256_hash_formatted(digest: &String) -> String {
     })
 }
 
+#[openapi()]
 #[get("/<player_id>/lookup?<alts>")]
 pub async fn lookup_player(
     state: &State<MarsAPIState>, 
@@ -363,6 +377,7 @@ pub async fn lookup_player(
     Ok(JsonResponder::created(PlayerLookupResponse { player, alts: player_alts }))
 }
 
+#[openapi()]
 #[post("/<player_id>/notes", format = "json", data = "<add_note_req>")]
 pub async fn add_player_note(
     state: &State<MarsAPIState>, 
@@ -388,6 +403,7 @@ pub async fn add_player_note(
     Ok(JsonResponder::created(player))
 }
 
+#[openapi()]
 #[delete("/<player_id>/notes/<note_id>")]
 pub async fn delete_player_note(
     state: &State<MarsAPIState>, 
@@ -411,6 +427,7 @@ pub async fn delete_player_note(
     Ok(JsonResponder::created(player))
 }
 
+#[openapi()]
 #[put("/<player_id>/active_tag", format = "json", data = "<tag_set_req>")]
 async fn set_active_tag(
     state: &State<MarsAPIState>, 
@@ -438,6 +455,7 @@ async fn set_active_tag(
     return Ok(JsonResponder::from(player, Status::Ok));
 }
 
+#[openapi()]
 #[put("/<player_id>/tags/<tag_id>")]
 async fn add_tag_to_player(
     state: &State<MarsAPIState>, 
@@ -462,6 +480,7 @@ async fn add_tag_to_player(
 }
 
 
+#[openapi()]
 #[delete("/<player_id>/tags/<tag_id>")]
 async fn delete_player_tag(
     state: &State<MarsAPIState>,
@@ -486,6 +505,7 @@ async fn delete_player_tag(
 
 }
 
+#[openapi()]
 #[put("/<player_id>/ranks/<rank_id>")]
 async fn add_player_rank(
     state: &State<MarsAPIState>, 
@@ -503,6 +523,7 @@ async fn add_player_rank(
     Ok(Json(player))
 }
 
+#[openapi()]
 #[delete("/<player_id>/ranks/<rank_id>")]
 async fn delete_player_rank(
     state: &State<MarsAPIState>, 
@@ -537,4 +558,23 @@ pub fn mount(rocket_build: Rocket<Build>) -> Rocket<Build> {
         add_player_rank,
         delete_player_rank
     ])
+}
+
+pub fn get_routes_and_docs() -> (Vec<rocket::Route>, OpenApi) {
+    openapi_get_routes_spec![
+        prelogin,
+        login,
+        logout,
+        profile,
+        issue_punishment,
+        get_punishments,
+        lookup_player,
+        add_player_note,
+        delete_player_note,
+        set_active_tag,
+        add_tag_to_player,
+        delete_player_tag,
+        add_player_rank,
+        delete_player_rank
+    ]
 }

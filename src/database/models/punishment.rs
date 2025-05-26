@@ -1,12 +1,15 @@
 use mars_api_rs_derive::IdentifiableDocument;
 use mars_api_rs_macro::IdentifiableDocument;
-use serde::{Serialize, Deserialize};
+use rocket_okapi::okapi::schemars;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use strum_macros::Display;
+
 use crate::{database::CollectionOwner, util::time::get_u64_time_millis};
 
 use super::player::SimplePlayer;
 
-#[derive(Debug, Serialize, Deserialize, IdentifiableDocument, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, IdentifiableDocument, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Punishment {
     #[id]
@@ -57,7 +60,7 @@ impl CollectionOwner<Punishment> for Punishment {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PunishmentType {
     pub name: String,
@@ -73,7 +76,7 @@ pub struct PunishmentType {
 }
 
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 pub struct PunishmentAction {
     pub kind: PunishmentKind,
     #[serde(default = "default_punishment_length")]
@@ -86,7 +89,7 @@ impl PunishmentAction {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Display)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, PartialEq, Display)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum PunishmentKind {
@@ -97,7 +100,7 @@ pub enum PunishmentKind {
     IpBan
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StaffNote {
     pub id: u32,
@@ -106,14 +109,14 @@ pub struct StaffNote {
     pub created_at: u64
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 pub struct PunishmentReason {
     pub name: String, 
     message: String, 
     short: String
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PunishmentReversion {
     pub reverted_at: u64,

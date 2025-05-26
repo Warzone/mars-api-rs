@@ -1,16 +1,25 @@
 #[macro_use] extern crate rocket;
 
-use std::{marker::PhantomData, sync::Arc, env, net::{Ipv4Addr, IpAddr}};
+use std::{env, marker::PhantomData, net::{IpAddr, Ipv4Addr}, sync::Arc};
+use std::collections::HashMap;
+use std::iter::Map;
 
 use anyhow::anyhow;
-use config::{deserialize_mars_config, MarsConfig};
-use database::{Database, cache::{Cache, get_redis_pool, RedisAdapter}, models::{player::Player, r#match::Match}};
-use rocket::{figment::Figment, http::Method, Build, Config, Rocket, Shutdown};
+use rocket::{Build, Config, figment::Figment, http::Method, Rocket, Route, Shutdown, State};
+use rocket::serde::json::Json;
 use rocket_cors::{AllowedOrigins, CorsOptions};
-use socket::leaderboard::MarsLeaderboards;
-use crate::database::migrations::MigrationExecutor;
+use rocket_okapi::{mount_endpoints_and_merged_docs, openapi, openapi_get_routes, openapi_get_routes_spec, openapi_get_spec, rapidoc::*, swagger_ui::*};
+use rocket_okapi::okapi::openapi3::OpenApi;
+use rocket_okapi::okapi::schemars;
+use rocket_okapi::okapi::schemars::JsonSchema;
+use rocket_okapi::settings::{OpenApiSettings, UrlObject};
 
-use crate::socket::socket_handler::{SocketState, setup_socket};
+use config::{deserialize_mars_config, MarsConfig};
+use database::{cache::{Cache, get_redis_pool, RedisAdapter}, Database, models::{player::Player, r#match::Match}};
+use socket::leaderboard::MarsLeaderboards;
+
+use crate::database::migrations::MigrationExecutor;
+use crate::socket::socket_handler::{setup_socket, SocketState};
 
 mod util;
 mod config;
@@ -53,7 +62,7 @@ fn rocket(state: MarsAPIState) -> Rocket<Build> {
         &http::broadcast::mount,
         &http::tag::mount,
         &http::status::mount,
-        &http::player::mount,
+        // &http::player::mount,
         &http::server::mount,
         &http::level::mount,
         &http::map::mount,
@@ -79,6 +88,41 @@ fn rocket(state: MarsAPIState) -> Rocket<Build> {
         build = (mount_fn)(build);
         build
     });
+
+    let settings = OpenApiSettings::default();
+
+    mount_endpoints_and_merged_docs! {
+        rocket_build, "/", settings,
+        "/mc/players" => http::player::get_routes_and_docs()
+    }
+
+    rocket_build = rocket_build
+        .mount(
+            "/swagger-ui/",
+            make_swagger_ui(&SwaggerUIConfig {
+                url: "../openapi.json".to_owned(),
+                ..Default::default()
+            }),
+        )
+        .mount(
+            "/rapidoc/",
+            make_rapidoc(&RapiDocConfig {
+                general: GeneralConfig {
+                    spec_urls: vec![UrlObject::new("General", "../openapi.json")],
+                    ..Default::default()
+                },
+                ui: UiConfig {
+                    theme: Theme::Dark,
+                    ..Default::default()
+                },
+                hide_show: HideShowConfig {
+                    allow_spec_url_load: false,
+                    allow_spec_file_load: false,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+        );
 
     rocket_build
 }
@@ -126,6 +170,11 @@ async fn setup_rocket(state: MarsAPIState) -> anyhow::Result<()> {
     Ok(())
 }
 
+
+#[rocket::get("/openapi.json")]
+fn openapi_json(spec: &State<OpenApi>) -> Json<OpenApi> {
+    Json(spec.inner().clone())
+}
 
 #[tokio::main]
 async fn main() -> Result<(), String> {

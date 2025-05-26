@@ -1,18 +1,20 @@
+use std::collections::HashMap;
 use std::future::Future;
 
-use mars_api_rs_macro::IdentifiableDocument;
 use mars_api_rs_derive::IdentifiableDocument;
+use mars_api_rs_macro::IdentifiableDocument;
 use mongodb::Collection;
-use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use num_traits::ToPrimitive;
+use rocket_okapi::okapi::schemars;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-use crate::{database::CollectionOwner, socket::{leaderboard::ScoreType, player::{player_xp_listener::PlayerXPListener, player_events::PlayerXPGainData}, server::server_context::ServerContext, event_type::EventType}};
+use crate::{database::CollectionOwner, socket::{event_type::EventType, leaderboard::ScoreType, player::{player_events::PlayerXPGainData, player_xp_listener::PlayerXPListener}, server::server_context::ServerContext}};
 use crate::database::models::server::{ServerEvents, XPMultiplier};
 
-use super::{punishment::StaffNote, level::LevelGamemode, r#match::Match};
+use super::{level::LevelGamemode, punishment::StaffNote, r#match::Match};
 
-#[derive(Debug, Serialize, Deserialize, Clone, IdentifiableDocument)]
+#[derive(Debug, Serialize, Deserialize, Clone, IdentifiableDocument, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Player {
     #[id]
@@ -102,7 +104,7 @@ impl CollectionOwner<Player> for Player {
 
 pub type GamemodeStats = PlayerStats;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerStats {
     #[serde(default)]
@@ -256,7 +258,7 @@ impl Default for PlayerStats {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerObjectiveStatistics {
     pub core_leaks: u32,
@@ -296,7 +298,7 @@ impl Default for PlayerObjectiveStatistics {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerRecords {
     #[serde(default)]
@@ -329,7 +331,7 @@ impl Default for PlayerRecords {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerRecord<T> {
     pub match_id: String,
@@ -337,14 +339,14 @@ pub struct PlayerRecord<T> {
     pub value: T
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionRecord {
     pub session_id: String,
     pub length: u64
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectileRecord {
     pub match_id: String,
@@ -352,7 +354,7 @@ pub struct ProjectileRecord {
     pub distance: u32
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FirstBloodRecord {
     pub match_id: String,
@@ -361,7 +363,7 @@ pub struct FirstBloodRecord {
     pub time: u64
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Hash, PartialEq, Eq, JsonSchema)]
 pub struct SimplePlayer {
     pub name: String,
     pub id: String
@@ -373,7 +375,7 @@ impl SimplePlayer {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 pub struct PlayerMessages {
     #[serde(default)]
     pub staff: u32,
@@ -383,7 +385,7 @@ pub struct PlayerMessages {
     pub team: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AchievementData {
     pub completion_time: u64

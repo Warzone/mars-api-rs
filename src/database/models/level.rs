@@ -1,10 +1,12 @@
-use mars_api_rs_macro::IdentifiableDocument;
 use mars_api_rs_derive::IdentifiableDocument;
-use serde::{Serialize, Deserialize};
+use mars_api_rs_macro::IdentifiableDocument;
+use rocket_okapi::okapi::schemars;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::database::CollectionOwner;
 
-use super::{r#match::GoalCollection, player::{PlayerRecord, ProjectileRecord, FirstBloodRecord}};
+use super::{player::{FirstBloodRecord, PlayerRecord, ProjectileRecord}, r#match::GoalCollection};
 
 #[derive(Serialize, Deserialize, IdentifiableDocument)]
 #[serde(rename_all = "camelCase")]
@@ -77,7 +79,7 @@ pub struct LevelContributor {
     contribution: Option<String>
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, strum_macros::EnumProperty, Hash, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, strum_macros::EnumProperty, Hash, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum LevelGamemode {

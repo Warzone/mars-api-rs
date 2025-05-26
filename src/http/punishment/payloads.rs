@@ -1,8 +1,10 @@
 use serde::{Serialize, Deserialize};
+use rocket_okapi::okapi::schemars;
+use schemars::JsonSchema;
 
 use crate::database::models::{punishment::{PunishmentReason, PunishmentAction}, player::SimplePlayer};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PunishmentIssueRequest {
     pub reason: PunishmentReason,
@@ -17,7 +19,7 @@ pub struct PunishmentIssueRequest {
     pub silent: bool
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PunishmentRevertRequest {
     pub reason: String,

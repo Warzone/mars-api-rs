@@ -1,11 +1,17 @@
 use std::collections::HashMap;
+use std::iter::Map;
 
+use rocket::{http::{ContentType, Status}, Request, response::{self, Responder, Response}, serde::json::Json};
+use rocket::serde::json::serde_json;
+use rocket_okapi::{gen::OpenApiGenerator, okapi::{Map as OkapiMap, schemars, map}, response::OpenApiResponderInner, Result as OkapiResult};
+use rocket_okapi::okapi::openapi3::{MediaType, RefOr, Response as OkapiResponse, Responses, SchemaObject};
+use rocket_okapi::okapi::schemars::schema::Schema;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use rocket::{response::{self, Response, Responder}, Request, http::{Status, ContentType}, serde::json::Json};
 
-use crate::{database::models::{player::{SimplePlayer, Player}, punishment::Punishment, session::Session}, socket::leaderboard::ScoreType};
+use crate::{database::models::{player::{Player, SimplePlayer}, punishment::Punishment, session::Session}, socket::leaderboard::ScoreType};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 pub struct PlayerPreLoginRequest {
     pub player: SimplePlayer,
     pub ip: String
@@ -17,7 +23,7 @@ pub struct PlayerPreLoginResponder {
     pub response: PlayerPreLoginResponse
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerPreLoginResponse {
     pub new: bool,
@@ -41,7 +47,7 @@ pub struct PlayerLoginResponder {
     pub response: PlayerLoginResponse
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerLoginResponse {
     pub active_session: Session
@@ -57,7 +63,7 @@ impl<'r> Responder<'r, 'static> for PlayerLoginResponder {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerLogoutRequest {
     pub player: SimplePlayer,
@@ -65,14 +71,14 @@ pub struct PlayerLogoutRequest {
     pub playtime: u64
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerLookupResponse {
     pub player: Player,
     pub alts: Vec<PlayerAltResponse>
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerAltResponse {
     pub player: Player,
@@ -80,7 +86,7 @@ pub struct PlayerAltResponse {
 }
 
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerProfileResponse {
     pub player: Player,
@@ -113,13 +119,13 @@ impl <'r> Responder<'r, 'static> for PlayerProfileResponder {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 pub struct PlayerAddNoteRequest {
     pub author: SimplePlayer,
     pub content: String
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerSetActiveTagRequest {
     pub active_tag_id: Option<String>
