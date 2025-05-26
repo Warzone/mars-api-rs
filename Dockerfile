@@ -1,4 +1,4 @@
-FROM rust:1.72
+FROM rust:1.82
 WORKDIR /usr/src/mars-api
 RUN mkdir /app
 COPY . .
