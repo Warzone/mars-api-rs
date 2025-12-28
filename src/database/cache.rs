@@ -95,7 +95,7 @@ impl Manager for RedisConnectionManager {
     }
 
     async fn check(&self, mut conn: Self::Connection) -> Result<Self::Connection, Self::Error> {
-        redis::cmd("PING").query_async(&mut conn).await?;
+        redis::cmd("PING").query_async::<_, ()>(&mut conn).await?;
         Ok(conn)
     }
 }
