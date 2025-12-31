@@ -98,7 +98,7 @@ async fn get_achievements(
     Json(state.database.get_all_documents::<Achievement>().await)
 }
 
-pub fn mount(rocket_build: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket_build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket_build.mount("/mc/achievements", routes![
        get_achievements,
        get_achievement_by_id,

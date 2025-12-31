@@ -132,6 +132,6 @@ async fn update_rank(
     Ok(Json(updated_rank))
 }
 
-pub fn mount(rocket: Rocket<Build>) -> Rocket<Build>  {
+pub fn mount(rocket: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build>  {
     rocket.mount("/mc/ranks", routes![create_rank, get_ranks, get_rank_by_id, get_players_by_rank_by_id, delete_rank, update_rank])
 }

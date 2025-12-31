@@ -1,13 +1,15 @@
 #[macro_use] extern crate rocket;
 
-use std::{marker::PhantomData, sync::Arc, env, net::{Ipv4Addr, IpAddr}};
+use std::{env, marker::PhantomData, net::{IpAddr, Ipv4Addr}, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
 use config::{deserialize_mars_config, MarsConfig};
 use database::{Database, cache::{Cache, get_redis_pool, RedisAdapter}, models::{player::Player, r#match::Match}};
+use http::map::image::{ImageState, image_queue_processor};
 use rocket::{figment::Figment, http::Method, Build, Config, Rocket, Shutdown};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use socket::leaderboard::MarsLeaderboards;
+use tokio::sync::Semaphore;
 use crate::database::migrations::MigrationExecutor;
 
 use crate::socket::socket_handler::{SocketState, setup_socket};
@@ -46,10 +48,11 @@ pub struct MarsAPIState {
     pub player_cache: Arc<Cache<Player>>,
     pub match_cache: Arc<Cache<Match>>,
     pub leaderboards: Arc<MarsLeaderboards>,
+    pub image_state: Arc<Option<ImageState>>
 }
 
 fn rocket(state: MarsAPIState) -> Rocket<Build> {
-    let mounts : Vec<&dyn Fn(Rocket<Build>) -> Rocket<Build>> = vec![
+    let mounts : Vec<&dyn Fn(Rocket<Build>, &MarsAPIState) -> Rocket<Build>> = vec![
         &http::broadcast::mount,
         &http::tag::mount,
         &http::status::mount,
@@ -73,12 +76,12 @@ fn rocket(state: MarsAPIState) -> Rocket<Build> {
         .merge::<(&str, IpAddr)>(("address", Ipv4Addr::new(0, 0, 0, 0).into()))
         .merge(("port", http_port))
         .extract().unwrap();
-    let mut rocket_build = rocket::custom(config).manage(state);
-
+    let mut rocket_build = rocket::custom(config);
     rocket_build = mounts.iter().fold(rocket_build, |mut build, mount_fn| {
-        build = (mount_fn)(build);
+        build = (mount_fn)(build, &state);
         build
     });
+    rocket_build = rocket_build.manage(state);
 
     rocket_build
 }
@@ -169,6 +172,28 @@ async fn main() -> Result<(), String> {
         resource_type: PhantomData
     });
 
+    // image processor
+    let image_state = Arc::new(match mars_config.options.images_path.as_ref() {
+        Some(path) => {
+            let transcode = mars_config.options.avif_transcode;
+            let image_guard = Semaphore::new(if transcode { 16 } else { 32 });
+            let pathbuf = {
+                let mut buf = PathBuf::new();
+                buf.push(path);
+                buf
+            };
+            let transmit = image_queue_processor(
+                Arc::new(pathbuf),
+                mars_config.options.avif_transcode,
+                Arc::new(image_guard)
+            );
+            Some(ImageState {
+                transmit: Arc::new(transmit)
+            })
+        },
+        None => None,
+    });
+
     // leaderboards
     let leaderboards = Arc::new(MarsLeaderboards::new(Arc::clone(&redis_adapter), Arc::clone(&database)));
 
@@ -179,7 +204,8 @@ async fn main() -> Result<(), String> {
         redis: Arc::clone(&redis_adapter), 
         player_cache, 
         match_cache,
-        leaderboards
+        leaderboards,
+        image_state
     };
 
 

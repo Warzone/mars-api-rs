@@ -520,7 +520,7 @@ async fn delete_player_rank(
     Ok(Json(player))
 }
 
-pub fn mount(rocket_build: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket_build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket_build.mount("/mc/players", routes![
         prelogin, 
         login, 

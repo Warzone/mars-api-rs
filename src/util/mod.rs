@@ -7,3 +7,4 @@ pub mod time;
 pub mod r#macro;
 pub mod responder;
 pub mod webhook;
+pub mod stream;

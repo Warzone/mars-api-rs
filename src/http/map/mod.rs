@@ -1,10 +1,15 @@
-use futures::future::join_all;
-use mongodb::bson::doc;
-use rocket::{Rocket, Build, State, serde::json::Json};
+use std::path::{Path, PathBuf};
 
-use crate::{MarsAPIState, http::map::payload::MapLoadOneRequest, util::{auth::AuthorizationToken, time::get_u64_time_millis, r#macro::unwrap_helper, error::ApiErrorResponder}, database::{models::level::{Level, LevelRecords}, Database}};
+use futures::{StreamExt, future::join_all};
+use image::{create_image_decoder, parse_image_data};
+use mongodb::bson::doc;
+use rocket::{Build, Data, Rocket, State, data::ToByteUnit, fs::FileServer, serde::json::Json};
+use tokio_util::codec::FramedRead;
+
+use crate::{MarsAPIState, database::{Database, models::level::{Level, LevelRecords}}, http::map::payload::MapLoadOneRequest, util::{auth::AuthorizationToken, error::ApiErrorResponder, r#macro::unwrap_helper, stream::LengthPrefixedDataDecoder, time::get_u64_time_millis}};
 
 mod payload;
+pub mod image;
 
 #[post("/", format = "json", data = "<maps>")]
 async fn add_maps(
@@ -12,7 +17,8 @@ async fn add_maps(
     maps: Json<Vec<MapLoadOneRequest>>,
     _auth_guard: AuthorizationToken
 ) -> Json<Vec<Level>> {
-    let map_list = maps.0;
+    let mut map_list = maps.0;
+    debug!("maps incoming are {:?}", &map_list);
     let map_list_length = map_list.len();
     let time_millis = get_u64_time_millis();
     let mut maps_to_save : Vec<Level> = Vec::new();
@@ -58,6 +64,37 @@ async fn add_maps(
     Json(state.database.get_all_documents().await)
 }
 
+#[post("/images", format = "application/octet-stream", data = "<image_data>")]
+async fn add_map_images(
+    state: &State<MarsAPIState>,
+    image_data: Data<'_>,
+    _auth_guard: AuthorizationToken
+) {
+    let t1 = get_u64_time_millis();
+    let Some(image_state) = state.image_state.as_ref() else {return};
+    let decoder = create_image_decoder();
+    let ds = image_data.open(128.mebibytes());
+    let mut framed = FramedRead::new(ds, decoder);
+    let mut frame_count = 0;
+    while let Some(frame_result) = framed.next().await {
+        frame_count += 1;
+        match frame_result {
+            Ok(frame) => {
+                if frame.len() == 0 {
+                    break;
+                }
+                let data = parse_image_data(frame);
+                image_state.transmit.send(data).await;
+            },
+            Err(e) => {
+                warn!("Bailed reading more images: {:?}", e);
+            },
+        }
+    }
+    let t2 = get_u64_time_millis();
+    info!("Took {}ms to store {} map images", t2 - t1, frame_count);
+}
+
 #[get("/")]
 async fn get_all_maps(state: &State<MarsAPIState>) -> Json<Vec<Level>> {
     Json(state.database.get_all_documents::<Level>().await)
@@ -69,6 +106,28 @@ async fn get_map_by_id(state: &State<MarsAPIState>, map_id: &str) -> Result<Json
     Ok(Json(map))
 }
 
-pub fn mount(build: Rocket<Build>) -> Rocket<Build> {
-    build.mount("/mc/maps", routes![add_maps, get_all_maps, get_map_by_id])
+fn get_map_images_directory(state: &State<MarsAPIState>) -> Option<PathBuf> {
+    match state.config.options.images_path.as_ref() {
+        Some(path) => {
+            let mut p = PathBuf::new();
+            p.push(path);
+            Some(p)
+        },
+        None => None
+    }
+}
+
+pub fn mount(build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
+    let build = build.mount(
+        "/mc/maps", 
+        routes![add_maps, get_all_maps, get_map_by_id, add_map_images]
+    );
+    if let Some(images_path) = &state.config.options.images_path {
+        if !std::fs::exists(&images_path).unwrap_or(false) {
+            std::fs::create_dir(&images_path).expect("Could not create images directory");
+        }
+        build.mount("/mc/maps/images", FileServer::from(Path::new(images_path.as_str())))
+    } else {
+        build
+    }
 }

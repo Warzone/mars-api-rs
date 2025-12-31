@@ -42,6 +42,6 @@ async fn revert_pun(
     Ok(Json(punishment))
 }
 
-pub fn mount(rocket: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket.mount("/mc/punishments", routes![get_pun_types, get_pun, revert_pun])
 }

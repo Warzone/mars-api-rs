@@ -70,7 +70,7 @@ impl Default for LevelRecords {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LevelContributor {
     uuid: String,

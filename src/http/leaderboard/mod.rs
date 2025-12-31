@@ -47,6 +47,6 @@ async fn get_leaderboard_entries(
     Ok(Json(leaderboard))
 }
 
-pub fn mount(rocket: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket.mount("/mc/leaderboards", routes![get_leaderboard_entries])
 }
