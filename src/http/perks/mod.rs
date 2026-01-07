@@ -36,7 +36,7 @@ async fn update_join_sound(
     }
 }
 
-pub fn mount(rocket_build: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket_build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket_build.mount("/mc/perks", routes![
         get_join_sounds,
         update_join_sound

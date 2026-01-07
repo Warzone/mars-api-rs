@@ -5,6 +5,7 @@ use anyhow::anyhow;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use mars_api_rs_macro::IdentifiableDocument;
+use mongodb::bson::Document;
 use mongodb::{bson::{doc, oid::ObjectId}, Client, Collection, Cursor, options::{ClientOptions, FindOneOptions, UpdateOptions}, results::DeleteResult};
 use mongodb::options::FindOptions;
 use rand::Rng;
@@ -14,7 +15,7 @@ use serde::Serialize;
 
 use models::tag::Tag;
 
-use crate::{database::models::player::Player, util::r#macro::unwrap_helper};
+use crate::database::models::player::Player;
 use crate::database::models::ip_identity::IpIdentity;
 use crate::database::models::player::SimplePlayer;
 use crate::util::validation::verbose_result_ok;
@@ -104,6 +105,19 @@ impl Database {
             Ok(possible_doc) => possible_doc,
             Err(_) => None
         }
+    }
+
+    pub async fn get_all_active_maps(&self, time: u64) -> Vec<Level> {
+        let cursor = 
+            match Level::get_collection(&self)
+                .find(doc! { "updatedAt": { "$gte": time as i64 } }, None).await {
+                    Ok(cursor) => cursor,
+                    Err(e) => {
+                        warn!("Error retrieving latest maps: {}", e);
+                        return Vec::new();
+                    }
+                };
+        Self::consume_cursor_into_owning_vec_option(Some(cursor)).await
     }
 
     pub async fn ensure_player_name_uniqueness(&self, name: &String, keep_id: &String) {
@@ -204,6 +218,15 @@ impl Database {
     pub async fn find_by_name<R>(&self, name: &str) -> Option<R>
         where R: CollectionOwner<R> + Serialize + IdentifiableDocument + DeserializeOwned + Unpin + Send + Sync {
         R::get_collection(&self).find_one(doc! { "nameLower": name.to_lowercase() }, None).await.unwrap_or(None)
+    }
+
+    pub async fn find_by_fields<R>(&self, value: &str, field_names: Vec<String>) -> Option<R>
+        where R: CollectionOwner<R> + Serialize + IdentifiableDocument + DeserializeOwned + Unpin + Send + Sync {
+        let conditions: Vec<Document> = field_names
+            .iter()
+            .map(|name| doc! { name: value })
+            .collect();
+        R::get_collection(&self).find_one(doc! { "$or": conditions }, None).await.unwrap_or(None)
     }
 
     pub async fn get_recent_matches(&self, limit: i64) -> Vec<Match> {

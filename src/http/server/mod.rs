@@ -126,6 +126,6 @@ async fn xp_multiplier_event(
     Ok(JsonResponder::ok(events))
 }
 
-pub fn mount(rocket_build: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket_build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket_build.mount("/mc/servers", routes![server_startup, server_status, server_events, xp_multiplier_event])
 }

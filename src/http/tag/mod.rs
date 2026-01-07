@@ -142,7 +142,7 @@ async fn update_tag(
     }
 }
 
-pub fn mount(rocket_build: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket_build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket_build.mount("/mc/tags", routes![
         create_tag,
         get_tags,

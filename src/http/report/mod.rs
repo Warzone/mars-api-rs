@@ -24,6 +24,6 @@ pub async fn new_report(
     Ok(())
 }
 
-pub fn mount(rocket_build: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket_build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket_build.mount("/mc/reports", routes![new_report])
 }

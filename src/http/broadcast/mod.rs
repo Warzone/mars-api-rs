@@ -6,6 +6,6 @@ pub fn broadcasts(state: &State<MarsAPIState>) -> Json<&Vec<Broadcast>> {
     Json(&state.config.data.broadcasts) 
 }
 
-pub fn mount(rocket_build: Rocket<Build>) -> Rocket<Build> {
+pub fn mount(rocket_build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
     rocket_build.mount("/mc/broadcasts", routes![broadcasts])
 }
