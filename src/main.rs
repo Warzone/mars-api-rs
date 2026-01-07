@@ -5,11 +5,11 @@ use std::{env, marker::PhantomData, net::{IpAddr, Ipv4Addr}, path::PathBuf, sync
 use anyhow::anyhow;
 use config::{deserialize_mars_config, MarsConfig};
 use database::{Database, cache::{Cache, get_redis_pool, RedisAdapter}, models::{player::Player, r#match::Match}};
-use http::map::image::{ImageState, image_queue_processor};
+use http::map::{MapState, image::{ImageState, image_queue_processor}};
 use rocket::{figment::Figment, http::Method, Build, Config, Rocket, Shutdown};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use socket::leaderboard::MarsLeaderboards;
-use tokio::sync::Semaphore;
+use tokio::sync::{RwLock, Semaphore};
 use crate::database::migrations::MigrationExecutor;
 
 use crate::socket::socket_handler::{SocketState, setup_socket};
@@ -48,7 +48,8 @@ pub struct MarsAPIState {
     pub player_cache: Arc<Cache<Player>>,
     pub match_cache: Arc<Cache<Match>>,
     pub leaderboards: Arc<MarsLeaderboards>,
-    pub image_state: Arc<Option<ImageState>>
+    pub image_state: Arc<Option<ImageState>>,
+    pub map_state: Arc<MapState>
 }
 
 fn rocket(state: MarsAPIState) -> Rocket<Build> {
@@ -205,7 +206,12 @@ async fn main() -> Result<(), String> {
         player_cache, 
         match_cache,
         leaderboards,
-        image_state
+        image_state,
+        map_state: Arc::new(MapState { 
+            last_update: Arc::new(
+                RwLock::new(0)
+            ) 
+        })
     };
 
 

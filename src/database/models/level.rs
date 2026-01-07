@@ -15,6 +15,8 @@ pub struct Level {
     pub loaded_at: u64,
     pub name: String,
     pub name_lower: String,
+    #[serde(default)]
+    pub slug: Option<String>,
     pub version: String,
     pub gamemodes: Vec<LevelGamemode>,
     pub updated_at: u64,

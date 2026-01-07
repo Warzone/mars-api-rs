@@ -1,9 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::{path::Path, sync::Arc};
 
-use futures::{StreamExt, future::join_all};
+use futures::{FutureExt, StreamExt, future::join_all};
 use image::{create_image_decoder, parse_image_data};
 use mongodb::bson::doc;
 use rocket::{Build, Data, Rocket, State, data::ToByteUnit, fs::FileServer, serde::json::Json};
+use tokio::sync::RwLock;
 use tokio_util::codec::FramedRead;
 
 use crate::{MarsAPIState, database::{Database, models::level::{Level, LevelRecords}}, http::map::payload::MapLoadOneRequest, util::{auth::AuthorizationToken, error::ApiErrorResponder, r#macro::unwrap_helper, stream::LengthPrefixedDataDecoder, time::get_u64_time_millis}};
@@ -17,14 +18,16 @@ async fn add_maps(
     maps: Json<Vec<MapLoadOneRequest>>,
     _auth_guard: AuthorizationToken
 ) -> Json<Vec<Level>> {
-    let mut map_list = maps.0;
-    debug!("maps incoming are {:?}", &map_list);
+    let map_list = maps.0;
     let map_list_length = map_list.len();
     let time_millis = get_u64_time_millis();
     let mut maps_to_save : Vec<Level> = Vec::new();
     
     let query_tasks : Vec<_> = map_list.iter().map(|map| {
-        state.database.find_by_name::<Level>(&map.name)
+        state.database.find_by_fields::<Level>(
+            map.slug.as_ref().unwrap_or(&map.name), 
+            vec![String::from("slug"), String::from("nameLower")]
+        )
     }).collect();
     let level_docs = join_all(query_tasks).await;
     for (map, level_opt) in map_list.into_iter().zip(level_docs) {
@@ -44,6 +47,7 @@ async fn add_maps(
                 id: map.id,
                 name: map.name,
                 name_lower: lowercase_map_name,
+                slug: map.slug,
                 version: map.version,
                 gamemodes: map.gamemodes,
                 loaded_at: time_millis,
@@ -57,8 +61,23 @@ async fn add_maps(
         });
     }
 
-    let save_tasks : Vec<_> = maps_to_save.iter().map(|map| { state.database.save(map) }).collect();
-    join_all(save_tasks).await;
+
+    let tasks = {
+        let mut all_tasks = Vec::new();
+        let save_tasks : Vec<_> = 
+            maps_to_save.iter().map(|map| { state.database.save(map).boxed() }).collect();
+        let update_map_state = {
+            let rwlock = state.map_state.last_update.clone();
+            async move {
+                let mut timestamp = rwlock.write().await;
+                *timestamp = time_millis;
+            }.boxed()
+        };
+        all_tasks.extend(save_tasks);
+        all_tasks.push(update_map_state);
+        all_tasks
+    };
+    join_all(tasks).await;
 
     info!("Received {} maps. Updating {} maps.", map_list_length, maps_to_save.len());
     Json(state.database.get_all_documents().await)
@@ -97,7 +116,7 @@ async fn add_map_images(
 
 #[get("/")]
 async fn get_all_maps(state: &State<MarsAPIState>) -> Json<Vec<Level>> {
-    Json(state.database.get_all_documents::<Level>().await)
+    Json(state.database.get_all_active_maps(*state.map_state.last_update.read().await).await)
 }
 
 #[get("/<map_id>")]
@@ -106,15 +125,9 @@ async fn get_map_by_id(state: &State<MarsAPIState>, map_id: &str) -> Result<Json
     Ok(Json(map))
 }
 
-fn get_map_images_directory(state: &State<MarsAPIState>) -> Option<PathBuf> {
-    match state.config.options.images_path.as_ref() {
-        Some(path) => {
-            let mut p = PathBuf::new();
-            p.push(path);
-            Some(p)
-        },
-        None => None
-    }
+#[derive(Clone)]
+pub struct MapState {
+    pub last_update: Arc<RwLock<u64>>
 }
 
 pub fn mount(build: Rocket<Build>, state: &MarsAPIState) -> Rocket<Build> {
