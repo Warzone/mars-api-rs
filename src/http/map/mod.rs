@@ -34,6 +34,7 @@ async fn add_maps(
         maps_to_save.push(if let Some(mut existing_map) = level_opt {
             existing_map.name = map.name;
             existing_map.name_lower = existing_map.name.to_lowercase();
+            existing_map.slug = map.slug;
             existing_map.version = map.version;
             existing_map.gamemodes = map.gamemodes;
             existing_map.authors = map.authors;
