@@ -93,7 +93,7 @@ async fn add_map_images(
     let t1 = get_u64_time_millis();
     let Some(image_state) = state.image_state.as_ref() else {return};
     let decoder = create_image_decoder();
-    let ds = image_data.open(128.mebibytes());
+    let ds = image_data.open(1.gibibytes());
     let mut framed = FramedRead::new(ds, decoder);
     let mut frame_count = 0;
     while let Some(frame_result) = framed.next().await {
@@ -108,6 +108,7 @@ async fn add_map_images(
             },
             Err(e) => {
                 warn!("Bailed reading more images: {:?}", e);
+                break;
             },
         }
     }
